@@ -40,12 +40,12 @@ public:
 		if (_direction == Direction::HORIZONTAL) {
 		    return _xStart + _text.length();
 		} else {
-			return _xStart;
+			return _xStart + 1;
 		}
 	}
 	size_t yEnd() const {
 		if (_direction == Direction::HORIZONTAL) {
-		    return _yStart;
+		    return _yStart + 1;
 		} else {
 			return _yStart + _text.length();
 		}
@@ -175,12 +175,30 @@ bool crosswordValid(const std::vector<Crossword>& words) {
     	}
     };
 
-    if (true && crosswordValid<HorizontalCharacters>(words, w, h)) {
+    if (crosswordValid<HorizontalCharacters>(words, w, h)) {
         if (crosswordValid<VerticalCharacters>(words, h, w)) {
             return true;
         }
     }
     return false;
+}
+
+size_t crosses(const std::vector<Crossword>& words) {
+	using CharacterInWord = std::pair<char, const Crossword*>;
+    using CharactersInWord = std::vector<CharacterInWord>;
+    const size_t w = width(words);
+    const size_t h = height(words);
+    size_t result = 0;
+
+	for (size_t y=0; y<h; y++) {
+		for (size_t x=0; x<w; x++) {
+			CharactersInWord csiw = characters(words, x, y);
+			if (csiw.size() > 1) {
+				result++;
+			}
+		}
+	}
+	return result;
 }
 
 std::string toString(const std::vector<Crossword>& words) {
@@ -289,6 +307,30 @@ void test_crosswordValid() {
 	assertTrue("crossword4 is not valid", !crosswordValid(crossword4));
 }
 
+bool increaseByOne (std::vector<size_t>& v,
+		size_t maxElementValue) {
+	bool carryFlag = false;
+
+	for (size_t& value : v) {
+		if (carryFlag) {
+			if (value != maxElementValue) {
+				value = value + 1;
+				carryFlag = false;
+				break;
+			} else {
+				value = 0;
+			}
+		} else if (value == maxElementValue) {
+			value = 0;
+			carryFlag = true;
+		} else {
+			value = value + 1;
+			break;
+		}
+	}
+	return !carryFlag;
+}
+
 int main() {
 	size_t numberOfFailedTests = 0;
 	try {
@@ -308,4 +350,40 @@ int main() {
 	} else {
 		std::cout << "All tests successful.\n";
 	}
+	using WordVector = std::vector<Crossword>;
+	using Direction = Crossword::Direction;
+	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG", "BAZAR"};
+	size_t MAX_LENGTH = 12;
+	std::vector<size_t> yValues (words.size(), 0);
+	size_t n = 0;
+
+	do {
+		std::vector<size_t> xValues (words.size(), 0);
+		do {
+			std::vector<size_t> directions (words.size(), 0);
+			do {
+				WordVector crossword;
+				for (size_t i=0; i<words.size(); i++) {
+					crossword.emplace_back(words[i].c_str(),
+							xValues[i], yValues[i],
+							directions[i] == 0 ? Direction::HORIZONTAL : Direction::VERTICAL);
+				}
+				if (crosswordValid(crossword)) {
+					size_t c = crosses(crossword);
+					if (c > 2) {
+						std::cout << "Found solution (";
+						std::cout << c << " crosses, n=" << n << "):\n";
+						std::cout << "===============\n";
+						std::cout << toString(crossword) << '\n';
+						std::cout << "===============\n";
+					}
+				}
+				if (n % 10000000 == 0 && n != 0) {
+					std::cout << "Searched " << n / 1000000;
+					std::cout << " million variants.\n";
+				}
+				n++;
+			} while (increaseByOne(directions, 2));
+		} while (increaseByOne(xValues, MAX_LENGTH));
+	} while (increaseByOne(yValues, MAX_LENGTH));
 }
