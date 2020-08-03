@@ -86,17 +86,17 @@ std::vector<std::pair<char, const Crossword*>> characters(
 	return founds;
 }
 
-bool crosswordValid(const std::vector<Crossword>& words) {
+template<class CHARACTERS>
+bool crosswordValid(const std::vector<Crossword>& words, size_t numberOfRows,
+		size_t numberOfLines) {
 	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
-    const size_t w = width(words);
-    const size_t h = height(words);
 	const Crossword* owner = nullptr;
 	const Crossword* partner = nullptr;
 	bool ownerPartnerClarified = false;
 
-	for (size_t y=0; y<h; y++) {
-		for (size_t x=0; x<w; x++) {
-			CharactersInWord ciw = characters(words, x, y);
+	for (size_t lineIndex=0; lineIndex < numberOfLines; lineIndex++) {
+		for (size_t rowIndex=0; rowIndex < numberOfRows; rowIndex++) {
+			CharactersInWord ciw = CHARACTERS{rowIndex, lineIndex}(words);
 			if (ciw.size() > 2) {
 				return false;
 			}
@@ -150,9 +150,38 @@ bool crosswordValid(const std::vector<Crossword>& words) {
 					ownerPartnerClarified = true;
 				}
 			}
+//			std::cout << ciw[0].first << "\n";
 		}
 	}
 	return true;
+}
+
+bool crosswordValid(const std::vector<Crossword>& words) {
+	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
+    const size_t w = width(words);
+    const size_t h = height(words);
+
+    struct HorizontalCharacters {
+    	size_t lineIndex;
+    	size_t rowIndex;
+    	CharactersInWord operator()(const std::vector<Crossword>& words) const {
+    		return characters(words, lineIndex, rowIndex);
+    	}
+    };
+    struct VerticalCharacters {
+    	size_t lineIndex;
+    	size_t rowIndex;
+    	CharactersInWord operator()(const std::vector<Crossword>& words) const {
+    		return characters(words, rowIndex, lineIndex);
+    	}
+    };
+
+    if (crosswordValid<HorizontalCharacters>(words, w, h)) {
+        if (crosswordValid<VerticalCharacters>(words, h, w)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 std::string toString(const std::vector<Crossword>& words) {
