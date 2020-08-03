@@ -150,7 +150,6 @@ bool crosswordValid(const std::vector<Crossword>& words, size_t numberOfRows,
 					ownerPartnerClarified = true;
 				}
 			}
-//			std::cout << ciw[0].first << "\n";
 		}
 	}
 	return true;
@@ -176,7 +175,7 @@ bool crosswordValid(const std::vector<Crossword>& words) {
     	}
     };
 
-    if (crosswordValid<HorizontalCharacters>(words, w, h)) {
+    if (true && crosswordValid<HorizontalCharacters>(words, w, h)) {
         if (crosswordValid<VerticalCharacters>(words, h, w)) {
             return true;
         }
@@ -211,25 +210,102 @@ std::string toString(const std::vector<Crossword>& words) {
 	return result;
 }
 
-int main() {
+class TestFailed : public std::exception {
+public:
+	TestFailed(const std::string& message)
+	: _message (message) {
+	}
+    virtual const char* what() const noexcept {
+    	return _message.c_str();
+    }
+private:
+	std::string _message;
+};
+
+void assertTrue(const std::string& checkDescription, bool expression) {
+	if (!expression) {
+		throw TestFailed("Assertion failed: " + checkDescription);
+	}
+}
+
+void test_toString() {
 	using WordVector = std::vector<Crossword>;
 	using Direction = Crossword::Direction;
-
-	WordVector words = {
+	WordVector crossword = {
 			{"MAIWANDERUNG", 0, 4, Direction::HORIZONTAL},
 			{"NEUN", 10, 4, Direction::VERTICAL},
-			//{"NEUN", 5, 5, Direction::VERTICAL},
-			//{"NEUN", 5, 5, Direction::HORIZONTAL},
 			{"SONNE", 5, 2, Direction::VERTICAL},
 			{"RADWEG", 1, 6, Direction::HORIZONTAL},
 			{"BAZAR", 8, 0, Direction::VERTICAL},
 	};
+	std::string expectedString =
+			"        B   \n"
+			"        A   \n"
+			"     S  Z   \n"
+			"     O  A   \n"
+			"MAIWANDERUNG\n"
+			"     N    E \n"
+			" RADWEG   U \n"
+			"          N \n";
+	assertTrue ("toString() works as expected",
+			expectedString == toString(crossword));
+}
 
-	std::cout << toString(words);
-	std::cout << "\nCrossword is ";
-	if (crosswordValid(words)) {
-	    std::cout << "valid\n";
+void test_crosswordValid() {
+	using WordVector = std::vector<Crossword>;
+	using Direction = Crossword::Direction;
+	WordVector crossword1 = {
+			{"MAIWANDERUNG", 0, 4, Direction::HORIZONTAL},
+			{"NEUN", 10, 4, Direction::VERTICAL},
+			{"SONNE", 5, 2, Direction::VERTICAL},
+			{"RADWEG", 1, 6, Direction::HORIZONTAL},
+			{"BAZAR", 8, 0, Direction::VERTICAL},
+	};
+	WordVector crossword2 = {
+			{"MAIWANDERUNG", 0, 4, Direction::HORIZONTAL},
+			{"NEUN", 5, 5, Direction::VERTICAL},
+			{"SONNE", 5, 2, Direction::VERTICAL},
+			{"RADWEG", 1, 6, Direction::HORIZONTAL},
+			{"BAZAR", 8, 0, Direction::VERTICAL},
+	};
+	WordVector crossword3 = {
+			{"MAIWANDERUNG", 0, 4, Direction::HORIZONTAL},
+			{"NEUN", 5, 5, Direction::HORIZONTAL},
+			{"SONNE", 5, 2, Direction::VERTICAL},
+			{"RADWEG", 1, 6, Direction::HORIZONTAL},
+			{"BAZAR", 8, 0, Direction::VERTICAL},
+	};
+	WordVector crossword4 = {
+			{"MAIWANDERUNG", 0, 4, Direction::HORIZONTAL},
+			{"NEUN", 10, 4, Direction::VERTICAL},
+			{"SONNE", 5, 1, Direction::VERTICAL},
+			{"RADWEG", 1, 6, Direction::HORIZONTAL},
+			{"BAZAR", 8, 0, Direction::VERTICAL},
+	};
+
+	assertTrue("crossword1 is valid", crosswordValid(crossword1));
+	assertTrue("crossword2 is not valid", !crosswordValid(crossword2));
+	assertTrue("crossword3 is not valid", !crosswordValid(crossword3));
+	assertTrue("crossword4 is not valid", !crosswordValid(crossword4));
+}
+
+int main() {
+	size_t numberOfFailedTests = 0;
+	try {
+		test_toString();
+	} catch (const TestFailed& e) {
+		std::cerr << e.what() << '\n';
+		numberOfFailedTests++;
+	}
+	try {
+		test_crosswordValid();
+	} catch (const TestFailed& e) {
+		std::cerr << e.what() << '\n';
+		numberOfFailedTests++;
+	}
+	if (numberOfFailedTests > 0) {
+		std::cerr << numberOfFailedTests << " test failed.\n";
 	} else {
-	    std::cout << "not valid\n";
+		std::cout << "All tests successful.\n";
 	}
 }
