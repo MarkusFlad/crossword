@@ -2,6 +2,7 @@
 #include <string>
 #include <utility>
 #include <iostream>
+#include <algorithm>
 
 class Crossword {
 public:
@@ -331,6 +332,68 @@ bool increaseByOne (std::vector<size_t>& v,
 	return !carryFlag;
 }
 
+template <class CrosswordProgress>
+std::vector<std::vector<Crossword>> findCrosswordsByBruteForce(
+		const std::vector<std::string>& words,
+		size_t minCrosses, size_t maxMatches) {
+	using WordVector = std::vector<Crossword>;
+	std::vector<WordVector> result;
+	std::vector<std::string>::const_iterator itMaxString =
+			std::max_element(words.begin(), words.end(),
+			[](const std::string& a, const std::string& b){
+				return a.length() < b.length();});
+	const size_t maxLength = itMaxString->length();
+	std::vector<size_t> yValues (words.size(), 0);
+	size_t n = 0;
+	CrosswordProgress cp;
+
+	do {
+		std::vector<size_t> xValues (words.size(), 0);
+		do {
+			std::vector<size_t> directions (words.size(), 0);
+			do {
+				WordVector crossword;
+				for (size_t i=0; i<words.size(); i++) {
+					using D = Crossword::Direction;
+					crossword.emplace_back(words[i].c_str(),
+							xValues[i], yValues[i],
+							directions[i] == 0 ? D::HORIZONTAL : D::VERTICAL);
+				}
+				if (crosswordValid(crossword)) {
+					size_t c = crosses(crossword);
+					if (c > minCrosses) {
+						cp.foundSolution(crossword, c, n);
+						result.push_back(crossword);
+						if (result.size() >= maxMatches) {
+							return result;
+						}
+					}
+				}
+				cp.nextIteration(n);
+				n++;
+			} while (increaseByOne(directions, 1));
+		} while (increaseByOne(xValues, maxLength));
+	} while (increaseByOne(yValues, maxLength));
+	return result;
+}
+
+struct CrosswordProgressPrinter {
+	void foundSolution(const std::vector<Crossword>& crossword, size_t crosses,
+			size_t iterations) {
+		std::cout << "Found solution (";
+		std::cout << crosses << " crosses, iterations=" << iterations << "):\n";
+		std::cout << "===============\n";
+		std::cout << toString(crossword) << '\n';
+		std::cout << "===============\n";
+	}
+	void nextIteration(size_t n) {
+		if (n % 10000000 == 0 && n != 0) {
+			std::cout << "Searched " << n / 1000000;
+			std::cout << " million variants.\n";
+		}
+	}
+};
+
 int main() {
 	size_t numberOfFailedTests = 0;
 	try {
@@ -350,40 +413,10 @@ int main() {
 	} else {
 		std::cout << "All tests successful.\n";
 	}
+	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
+			"BAZAR"};
 	using WordVector = std::vector<Crossword>;
-	using Direction = Crossword::Direction;
-	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG", "BAZAR"};
-	size_t MAX_LENGTH = 12;
-	std::vector<size_t> yValues (words.size(), 0);
-	size_t n = 0;
-
-	do {
-		std::vector<size_t> xValues (words.size(), 0);
-		do {
-			std::vector<size_t> directions (words.size(), 0);
-			do {
-				WordVector crossword;
-				for (size_t i=0; i<words.size(); i++) {
-					crossword.emplace_back(words[i].c_str(),
-							xValues[i], yValues[i],
-							directions[i] == 0 ? Direction::HORIZONTAL : Direction::VERTICAL);
-				}
-				if (crosswordValid(crossword)) {
-					size_t c = crosses(crossword);
-					if (c > 2) {
-						std::cout << "Found solution (";
-						std::cout << c << " crosses, n=" << n << "):\n";
-						std::cout << "===============\n";
-						std::cout << toString(crossword) << '\n';
-						std::cout << "===============\n";
-					}
-				}
-				if (n % 10000000 == 0 && n != 0) {
-					std::cout << "Searched " << n / 1000000;
-					std::cout << " million variants.\n";
-				}
-				n++;
-			} while (increaseByOne(directions, 2));
-		} while (increaseByOne(xValues, MAX_LENGTH));
-	} while (increaseByOne(yValues, MAX_LENGTH));
+	std::vector<WordVector> foundCrosswords =
+			findCrosswordsByBruteForce<CrosswordProgressPrinter>(words, 3, 10);
+	return foundCrosswords.size();
 }
