@@ -1,4 +1,5 @@
 #include <vector>
+#include <set>
 #include <string>
 #include <utility>
 #include <iostream>
@@ -403,10 +404,10 @@ bool increaseByOne (std::vector<T>& v,
 }
 
 template <class CrosswordProgress>
-std::vector<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
+std::set<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
 		const std::vector<std::string>& words,
 		size_t minCrosses, size_t maxMatches) {
-	std::vector<CrosswordPuzzle> result;
+	std::set<CrosswordPuzzle> result;
 	std::vector<std::string>::const_iterator itMaxString =
 			std::max_element(words.begin(), words.end(),
 			[](const std::string& a, const std::string& b){
@@ -432,7 +433,7 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
 					size_t c = puzzle.crosses();
 					if (c >= minCrosses) {
 						cp.foundSolution(puzzle, c, n);
-						result.push_back(puzzle);
+						result.insert(puzzle);
 						if (result.size() >= maxMatches) {
 							return result;
 						}
@@ -532,14 +533,20 @@ private:
 };
 
 template <class CrosswordProgress>
-std::vector<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
+std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 		const std::vector<std::string>& words,
 		size_t minCrosses, size_t maxMatches) {
-	std::vector<CrosswordPuzzle> found;
+	std::set<CrosswordPuzzle> found;
 	CrosswordProgress cp;
-	std::vector<std::string> permutedWords = words;
 	size_t n = 0;
+	std::vector<std::string> permutedWords = words;
 
+	// Sort words by length so that the of the longest word changes very often
+	// between vertical and horizontal.
+	std::sort(permutedWords.begin(), permutedWords.end(),
+			[](const std::string& a, const std::string& b) {
+		return a.length() < b.length();
+	});
 	do {
 		std::vector<size_t> directions (words.size(), 0);
 		do {
@@ -561,7 +568,7 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
 				if (c >= minCrosses) {
-					found.push_back(foundPuzzle);
+					found.insert(foundPuzzle);
 					cp.foundSolution(foundPuzzle, c, n);
 					if (found.size() >= maxMatches) {
 						return found;
@@ -611,9 +618,12 @@ int main() {
 	} else {
 		std::cout << "All tests successful.\n";
 	}
+//	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
+//			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
+//	        "HUENDLE", "STELLER", "MAIWANDERUNG"};
 	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
 			"BAZAR"};
-	std::vector<CrosswordPuzzle> foundCrosswords =
+	std::set<CrosswordPuzzle> foundCrosswords =
 			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
 					words, 4, 100000);
 	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
