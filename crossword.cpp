@@ -1,5 +1,4 @@
 #include <vector>
-#include <set>
 #include <string>
 #include <utility>
 #include <iostream>
@@ -98,50 +97,67 @@ private:
 class CrosswordPuzzle : public std::vector<Crossword> {
 public:
 	CrosswordPuzzle()
-	: std::vector<Crossword>() {
+	: std::vector<Crossword>()
+	, _limitCalculationsDone(false)
+	, _xStart(std::numeric_limits<int>::min())
+	, _xEnd(std::numeric_limits<int>::max())
+	, _yStart(std::numeric_limits<int>::min())
+	, _yEnd(std::numeric_limits<int>::max()) {
 	}
 	CrosswordPuzzle(const CrosswordPuzzle& puzzle)
 	: std::vector<Crossword>(puzzle)
-	, _independent(puzzle._independent) {
+	, _limitCalculationsDone(puzzle._limitCalculationsDone)
+	, _xStart(puzzle._xStart)
+	, _xEnd(puzzle._xEnd)
+	, _yStart(puzzle._yStart)
+	, _yEnd(puzzle._yEnd) {
 	}
 	CrosswordPuzzle(std::initializer_list<Crossword> il)
-	: std::vector<Crossword>(il) {
+	: std::vector<Crossword>(il)
+	, _limitCalculationsDone(false)
+	, _xStart(std::numeric_limits<int>::min())
+	, _xEnd(std::numeric_limits<int>::max())
+	, _yStart(std::numeric_limits<int>::min())
+	, _yEnd(std::numeric_limits<int>::max()) {
 	}
-	CrosswordPuzzle(const CrosswordPuzzle& puzzle,
-			WordWithDirection independent)
-	: std::vector<Crossword>(puzzle) {
-		_independent.insert(independent);
+	CrosswordPuzzle& operator=(const CrosswordPuzzle& puzzle) {
+		std::vector<Crossword>::operator=(puzzle);
+	    _limitCalculationsDone = puzzle._limitCalculationsDone;
+	    _xStart = puzzle._xStart;
+	    _xEnd = puzzle._xEnd;
+	    _yStart = puzzle._yStart;
+	    _yEnd = puzzle._yEnd;
+	    return *this;
 	}
-	const std::set<WordWithDirection>& independent() const {
-		return _independent;
+	template<typename... Args>
+	void emplace_back(Args&&... args) {
+		_limitCalculationsDone = false;
+		std::vector<Crossword>::emplace_back(std::forward<Args>(args)...);
 	}
+
 	int xStart() const {
-		int xStart = std::numeric_limits<int>::max();
-		for (const Crossword& word : *this) {
-			xStart = std::min(xStart, word.xStart());
+		if (!_limitCalculationsDone) {
+			calculateLimits();
 		}
-		return xStart;
+		return _xStart;
 	}
 	int xEnd() const {
-		int xEnd = std::numeric_limits<int>::min();
-		for (const Crossword& word : *this) {
-			xEnd = std::max(xEnd, word.xEnd());
+		if (!_limitCalculationsDone) {
+			calculateLimits();
 		}
-		return xEnd;
+		return _xEnd;
 	}
 	int yStart() const {
-		int yStart = std::numeric_limits<int>::max();
-		for (const Crossword& word : *this) {
-			yStart = std::min(yStart, word.yStart());
+		if (!_limitCalculationsDone) {
+			calculateLimits();
 		}
-		return yStart;
+		return _yStart;
 	}
 	int yEnd() const {
-		int yEnd = std::numeric_limits<int>::min();
-		for (const Crossword& word : *this) {
-			yEnd = std::max(yEnd, word.yEnd());
+		if (!_limitCalculationsDone) {
+			calculateLimits();
 		}
-		return yEnd;
+		return _yEnd;
 	}
 	std::vector<std::pair<char, const Crossword*>> characters(int x,
 			int y) const {
@@ -293,9 +309,32 @@ protected:
 		}
 		return true;
 	}
-
+protected:
+	void calculateLimits() const {
+		_xStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			_xStart = std::min(_xStart, word.xStart());
+		}
+		_xEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
+			_xEnd = std::max(_xEnd, word.xEnd());
+		}
+		_yStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			_yStart = std::min(_yStart, word.yStart());
+		}
+		_yEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
+			_yEnd = std::max(_yEnd, word.yEnd());
+		}
+		_limitCalculationsDone = true;
+	}
 private:
-	std::set<WordWithDirection> _independent;
+	mutable bool _limitCalculationsDone;
+	mutable int _xStart;
+	mutable int _xEnd;
+	mutable int _yStart;
+	mutable int _yEnd;
 };
 
 class TestFailed : public std::exception {
@@ -528,27 +567,9 @@ void processNextCrosswordPuzzles(const std::vector<CrosswordPuzzle>& puzzles,
 	}
 }
 
-class AlwaysPushBack {
+class StoreValidPuzzle {
 public:
-	AlwaysPushBack(std::vector<CrosswordPuzzle>& found)
-    : _found (found) {
-	}
-	void operator()(const CrosswordPuzzle& puzzleOrigin,
-			const CrosswordPuzzle& puzzleNew,
-			const WordWithDirection& currentWord){
-		if (puzzleNew.valid()) {
-			_found.push_back(puzzleNew);
-		} else {
-			_found.push_back(CrosswordPuzzle(puzzleOrigin, currentWord));
-		}
-	}
-private:
-	std::vector<CrosswordPuzzle>& _found;
-};
-
-class IfValidPushBack {
-public:
-	IfValidPushBack(std::vector<CrosswordPuzzle>& found)
+	StoreValidPuzzle(std::vector<CrosswordPuzzle>& found)
     : _found (found) {
 	}
 	void operator()(const CrosswordPuzzle& puzzleOrigin,
@@ -583,26 +604,12 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			std::vector<CrosswordPuzzle> foundUnfiltered;
 			for (const WordWithDirection& wwd : wordsWithDirection) {
 				std::vector<CrosswordPuzzle> nextFounds;
-				AlwaysPushBack alwaysPushBack(nextFounds);
-				processNextCrosswordPuzzles<AlwaysPushBack>(foundUnfiltered,
-						wwd, alwaysPushBack);
+				StoreValidPuzzle storeValidPuzzle(nextFounds);
+				processNextCrosswordPuzzles<StoreValidPuzzle>(foundUnfiltered,
+						wwd, storeValidPuzzle);
 				foundUnfiltered.insert(foundUnfiltered.begin(),
 						nextFounds.begin(), nextFounds.end());
 			}
-//			std::vector<CrosswordPuzzle> foundUnfilteredExt;
-//			IfValidPushBack ifValidPushBack(foundUnfilteredExt);
-//			for (const CrosswordPuzzle& puzzle : foundUnfiltered) {
-//				std::vector<CrosswordPuzzle> nextFounds;
-//				IfValidPushBack ifValidPushBack(nextFounds);
-//				for (const WordWithDirection& iw: puzzle.independent()) {
-//					processNextCrosswordPuzzles(foundUnfiltered, iw,
-//							ifValidPushBack);
-//				}
-//				foundUnfilteredExt.insert(foundUnfilteredExt.begin(),
-//						nextFounds.begin(), nextFounds.end());
-//			}
-//			foundUnfiltered.insert(foundUnfiltered.begin(),
-//					foundUnfilteredExt.begin(), foundUnfilteredExt.end());
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
 				if (c >= minCrosses) {
