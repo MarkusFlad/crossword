@@ -97,67 +97,41 @@ private:
 class CrosswordPuzzle : public std::vector<Crossword> {
 public:
 	CrosswordPuzzle()
-	: std::vector<Crossword>()
-	, _limitCalculationsDone(false)
-	, _xStart(std::numeric_limits<int>::min())
-	, _xEnd(std::numeric_limits<int>::max())
-	, _yStart(std::numeric_limits<int>::min())
-	, _yEnd(std::numeric_limits<int>::max()) {
+	: std::vector<Crossword>() {
 	}
 	CrosswordPuzzle(const CrosswordPuzzle& puzzle)
-	: std::vector<Crossword>(puzzle)
-	, _limitCalculationsDone(puzzle._limitCalculationsDone)
-	, _xStart(puzzle._xStart)
-	, _xEnd(puzzle._xEnd)
-	, _yStart(puzzle._yStart)
-	, _yEnd(puzzle._yEnd) {
+	: std::vector<Crossword>(puzzle) {
 	}
 	CrosswordPuzzle(std::initializer_list<Crossword> il)
-	: std::vector<Crossword>(il)
-	, _limitCalculationsDone(false)
-	, _xStart(std::numeric_limits<int>::min())
-	, _xEnd(std::numeric_limits<int>::max())
-	, _yStart(std::numeric_limits<int>::min())
-	, _yEnd(std::numeric_limits<int>::max()) {
+	: std::vector<Crossword>(il) {
 	}
-	CrosswordPuzzle& operator=(const CrosswordPuzzle& puzzle) {
-		std::vector<Crossword>::operator=(puzzle);
-	    _limitCalculationsDone = puzzle._limitCalculationsDone;
-	    _xStart = puzzle._xStart;
-	    _xEnd = puzzle._xEnd;
-	    _yStart = puzzle._yStart;
-	    _yEnd = puzzle._yEnd;
-	    return *this;
-	}
-	template<typename... Args>
-	void emplace_back(Args&&... args) {
-		_limitCalculationsDone = false;
-		std::vector<Crossword>::emplace_back(std::forward<Args>(args)...);
-	}
-
 	int xStart() const {
-		if (!_limitCalculationsDone) {
-			calculateLimits();
+		int xStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			xStart = std::min(xStart, word.xStart());
 		}
-		return _xStart;
+		return xStart;
 	}
 	int xEnd() const {
-		if (!_limitCalculationsDone) {
-			calculateLimits();
+		int xEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
+			xEnd = std::max(xEnd, word.xEnd());
 		}
-		return _xEnd;
+		return xEnd;
 	}
 	int yStart() const {
-		if (!_limitCalculationsDone) {
-			calculateLimits();
+		int yStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			yStart = std::min(yStart, word.yStart());
 		}
-		return _yStart;
+		return yStart;
 	}
 	int yEnd() const {
-		if (!_limitCalculationsDone) {
-			calculateLimits();
+		int yEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
+			yEnd = std::max(yEnd, word.yEnd());
 		}
-		return _yEnd;
+		return yEnd;
 	}
 	std::vector<std::pair<char, const Crossword*>> characters(int x,
 			int y) const {
@@ -309,32 +283,6 @@ protected:
 		}
 		return true;
 	}
-protected:
-	void calculateLimits() const {
-		_xStart = std::numeric_limits<int>::max();
-		for (const Crossword& word : *this) {
-			_xStart = std::min(_xStart, word.xStart());
-		}
-		_xEnd = std::numeric_limits<int>::min();
-		for (const Crossword& word : *this) {
-			_xEnd = std::max(_xEnd, word.xEnd());
-		}
-		_yStart = std::numeric_limits<int>::max();
-		for (const Crossword& word : *this) {
-			_yStart = std::min(_yStart, word.yStart());
-		}
-		_yEnd = std::numeric_limits<int>::min();
-		for (const Crossword& word : *this) {
-			_yEnd = std::max(_yEnd, word.yEnd());
-		}
-		_limitCalculationsDone = true;
-	}
-private:
-	mutable bool _limitCalculationsDone;
-	mutable int _xStart;
-	mutable int _xEnd;
-	mutable int _yStart;
-	mutable int _yEnd;
 };
 
 class TestFailed : public std::exception {
