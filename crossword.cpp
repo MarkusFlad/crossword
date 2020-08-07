@@ -1,8 +1,10 @@
 #include <vector>
+#include <set>
 #include <string>
 #include <utility>
 #include <iostream>
 #include <algorithm>
+#include <limits>
 
 class WordWithDirection {
 public:
@@ -15,6 +17,13 @@ public:
 	}
 	char operator[](size_t i) const {
 		return _text[i];
+	}
+	bool operator<(const WordWithDirection& other) const {
+		if (_direction != other._direction) {
+			return _direction == Direction::HORIZONTAL ? true : false;
+		} else {
+			return _text < other._text;
+		}
 	}
 	size_t length() const {
 		return _text.length();
@@ -29,17 +38,17 @@ protected:
 
 class Crossword : public WordWithDirection{
 public:
-	Crossword (const char* text, size_t xStart, size_t yStart, Direction direction)
+	Crossword (const char* text, int xStart, int yStart, Direction direction)
 	: WordWithDirection (text, direction),
 	  _xStart(xStart), _yStart(yStart){
 	}
-	Crossword (const WordWithDirection& wwd, size_t xStart, size_t yStart)
+	Crossword (const WordWithDirection& wwd, int xStart, int yStart)
 	: WordWithDirection (wwd), _xStart(xStart), _yStart(yStart){
 	}
-	size_t xStart() const {
+	int xStart() const {
 		return _xStart;
 	}
-	size_t yStart() const {
+	int yStart() const {
 		return _yStart;
 	}
 	bool operator<(const Crossword& other) const {
@@ -54,26 +63,27 @@ public:
 		}
 		return false;
 	}
-	char character(size_t x, size_t y) const {
+	char character(int x, int y) const {
+		int textLength = static_cast<int>(_text.length());
 		if (_direction == Direction::HORIZONTAL && _yStart == y) {
-			if (x >= _xStart && x <= _xStart + _text.length()) {
+			if (x >= _xStart && x <= _xStart + textLength) {
 				return _text[x - _xStart];
 			}
 		} else if (_direction == Direction::VERTICAL && _xStart == x) {
-			if (y >= _yStart && y <= _yStart + _text.length()) {
+			if (y >= _yStart && y <= _yStart + textLength) {
 				return _text[y - _yStart];
 			}
 		}
 		return 0;
 	}
-	size_t xEnd() const {
+	int xEnd() const {
 		if (_direction == Direction::HORIZONTAL) {
 		    return _xStart + _text.length();
 		} else {
 			return _xStart + 1;
 		}
 	}
-	size_t yEnd() const {
+	int yEnd() const {
 		if (_direction == Direction::HORIZONTAL) {
 		    return _yStart + 1;
 		} else {
@@ -81,8 +91,8 @@ public:
 		}
 	}
 private:
-	size_t _xStart;
-	size_t _yStart;
+	int _xStart;
+	int _yStart;
 };
 
 class CrosswordPuzzle : public std::vector<Crossword> {
@@ -90,34 +100,51 @@ public:
 	CrosswordPuzzle()
 	: std::vector<Crossword>() {
 	}
+	CrosswordPuzzle(const CrosswordPuzzle& puzzle)
+	: std::vector<Crossword>(puzzle)
+	, _independent(puzzle._independent) {
+	}
 	CrosswordPuzzle(std::initializer_list<Crossword> il)
 	: std::vector<Crossword>(il) {
 	}
 	CrosswordPuzzle(const CrosswordPuzzle& puzzle,
 			WordWithDirection independent)
 	: std::vector<Crossword>(puzzle) {
-		if (independent.direction() == Crossword::Direction::HORIZONTAL) {
-			_horizontalIndependent.push_back(independent);
-		} else {
-			_verticalIndependent.push_back(independent);
-		}
+		_independent.insert(independent);
 	}
-	size_t width() const {
-		size_t xEnd = 0;
-		for (Crossword word : *this) {
+	const std::set<WordWithDirection>& independent() const {
+		return _independent;
+	}
+	int xStart() const {
+		int xStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			xStart = std::min(xStart, word.xStart());
+		}
+		return xStart;
+	}
+	int xEnd() const {
+		int xEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
 			xEnd = std::max(xEnd, word.xEnd());
 		}
 		return xEnd;
 	}
-	size_t height() const {
-		size_t yEnd = 0;
-		for (Crossword word : *this) {
+	int yStart() const {
+		int yStart = std::numeric_limits<int>::max();
+		for (const Crossword& word : *this) {
+			yStart = std::min(yStart, word.yStart());
+		}
+		return yStart;
+	}
+	int yEnd() const {
+		int yEnd = std::numeric_limits<int>::min();
+		for (const Crossword& word : *this) {
 			yEnd = std::max(yEnd, word.yEnd());
 		}
 		return yEnd;
 	}
-	std::vector<std::pair<char, const Crossword*>> characters(size_t x,
-			size_t y) const {
+	std::vector<std::pair<char, const Crossword*>> characters(int x,
+			int y) const {
 		std::vector<std::pair<char, const Crossword*>> founds;
 		for (size_t i=0; i<size(); i++) {
 			const Crossword& word = operator[](i);
@@ -131,26 +158,24 @@ public:
 
 	bool valid() const {
 		using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
-	    const size_t w = width();
-	    const size_t h = height();
 
 	    struct HorizontalCharacters {
-	    	size_t lineIndex;
-	    	size_t rowIndex;
+	    	int lineIndex;
+	    	int rowIndex;
 	    	CharactersInWord operator()(const CrosswordPuzzle& puzzle) const {
 	    		return puzzle.characters(lineIndex, rowIndex);
 	    	}
 	    };
 	    struct VerticalCharacters {
-	    	size_t lineIndex;
-	    	size_t rowIndex;
+	    	int lineIndex;
+	    	int rowIndex;
 	    	CharactersInWord operator()(const CrosswordPuzzle& puzzle) const {
 	    		return puzzle.characters(rowIndex, lineIndex);
 	    	}
 	    };
 
-	    if (validImpl<HorizontalCharacters>(w, h)) {
-	        if (validImpl<VerticalCharacters>(h, w)) {
+	    if (validImpl<HorizontalCharacters>(xStart(), xEnd(), yStart(), yEnd())) {
+		    if (validImpl<VerticalCharacters>(yStart(), yEnd(), xStart(), xEnd())) {
 	            return true;
 	        }
 	    }
@@ -159,12 +184,10 @@ public:
 	size_t crosses() const {
 		using CharacterInWord = std::pair<char, const Crossword*>;
 	    using CharactersInWord = std::vector<CharacterInWord>;
-	    const size_t w = width();
-	    const size_t h = height();
 	    size_t result = 0;
 
-		for (size_t y=0; y<h; y++) {
-			for (size_t x=0; x<w; x++) {
+		for (int y=yStart(); y<yEnd(); y++) {
+			for (int x=xStart(); x<yEnd(); x++) {
 				CharactersInWord csiw = characters(x, y);
 				if (csiw.size() > 1) {
 					result++;
@@ -176,16 +199,16 @@ public:
 	std::string toString() const {
 		using CharacterInWord = std::pair<char, const Crossword*>;
 	    using CharactersInWord = std::vector<CharacterInWord>;
-	    const size_t w = width();
-	    const size_t h = height();
+	    const size_t w = xEnd() - xStart();
+	    const size_t h = yEnd() - yStart();
 	    std::string result((w + 1) * h, '\n');
 	    size_t i = 0;
 
-		for (size_t y=0; y<h; y++) {
-			for (size_t x=0; x<w; x++) {
+		for (int y=yStart(); y<yEnd(); y++) {
+			for (int x=xStart(); x<xEnd(); x++) {
 				CharactersInWord csiw = characters(x, y);
 				char c = ' ';
-				for (CharacterInWord ciw : csiw) {
+				for (const CharacterInWord& ciw : csiw) {
 					if (c == ' ') {
 					    c = ciw.first;
 					} else if (c != ciw.first) {
@@ -202,14 +225,14 @@ public:
 
 protected:
 	template<class CHARACTERS>
-	bool validImpl(size_t numberOfRows, size_t numberOfLines) const {
+	bool validImpl(int rowStart, int rowEnd, int lineStart, int lineEnd) const {
 		using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
 		const Crossword* owner = nullptr;
 		const Crossword* partner = nullptr;
 		bool ownerPartnerClarified = false;
 
-		for (size_t lineIndex=0; lineIndex < numberOfLines; lineIndex++) {
-			for (size_t rowIndex=0; rowIndex < numberOfRows; rowIndex++) {
+		for (int lineIndex=lineStart; lineIndex < lineEnd; lineIndex++) {
+			for (int rowIndex=rowStart; rowIndex < rowEnd; rowIndex++) {
 				CharactersInWord ciw = CHARACTERS{rowIndex, lineIndex}(*this);
 				if (ciw.size() > 2) {
 					return false;
@@ -272,8 +295,7 @@ protected:
 	}
 
 private:
-	std::vector<WordWithDirection> _horizontalIndependent;
-	std::vector<WordWithDirection> _verticalIndependent;
+	std::set<WordWithDirection> _independent;
 };
 
 class TestFailed : public std::exception {
@@ -350,15 +372,26 @@ void test_valid() {
 			{"MAIWANDERUNG", 0, 0, Direction::HORIZONTAL},
 			{"NEUN", 0, 2, Direction::HORIZONTAL},
 	};
+	CrosswordPuzzle puzzle6 = {
+			{"MAIWANDERUNG", 0, 0, Direction::VERTICAL},
+			{"NEUN", 0, 5, Direction::HORIZONTAL},
+	};
+	CrosswordPuzzle puzzle7 = {
+			{"MAIWANDERUNG", 0, 0, Direction::VERTICAL},
+			{"RADWEG", 0, 1, Direction::HORIZONTAL},
+	};
 
 	assertTrue("crossword1 is valid", puzzle1.valid());
 	assertTrue("crossword2 is not valid", !puzzle2.valid());
 	assertTrue("crossword3 is not valid", !puzzle3.valid());
 	assertTrue("crossword4 is not valid", !puzzle4.valid());
 	assertTrue("crossword5 is valid", puzzle5.valid());
+	assertTrue("crossword6 is valid", puzzle6.valid());
+	assertTrue("crossword7 is not valid", !puzzle7.valid());
 }
 
-bool increaseByOne (std::vector<size_t>& v,
+template<typename T>
+bool increaseByOne (std::vector<T>& v,
 		size_t maxElementValue) {
 	bool carryFlag = false;
 
@@ -392,14 +425,14 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
 			[](const std::string& a, const std::string& b){
 				return a.length() < b.length();});
 	const size_t maxLength = itMaxString->length();
-	std::vector<size_t> yValues (words.size(), 0);
+	std::vector<int> yValues (words.size(), 0);
 	size_t n = 0;
 	CrosswordProgress cp;
 
 	do {
-		std::vector<size_t> xValues (words.size(), 0);
+		std::vector<int> xValues (words.size(), 0);
 		do {
-			std::vector<size_t> directions (words.size(), 0);
+			std::vector<int> directions (words.size(), 0);
 			do {
 				CrosswordPuzzle puzzle;
 				for (size_t i=0; i<words.size(); i++) {
@@ -426,53 +459,64 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
 	return result;
 }
 
-std::vector<CrosswordPuzzle> findCrosswordPuzzles(
-		const CrosswordPuzzle& puzzle, size_t x, size_t y,
-		const WordWithDirection& wwd) {
+template <class PUSH_BACK_TO_PUZZLE, class PROCESS_NEXT_PUZZLE>
+void processNextCrosswordPuzzles(const CrosswordPuzzle& puzzle,
+		int x, int y, const WordWithDirection& wwd,
+		PROCESS_NEXT_PUZZLE& pnpFunctor) {
 	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
-	std::vector<CrosswordPuzzle> found;
 	CharactersInWord ciw = puzzle.characters(x, y);
 	char currentChar = ciw[0].first;
 	if (ciw.size() == 1) {
+		PUSH_BACK_TO_PUZZLE pbtp;
 		for (size_t i=0; i<wwd.length(); i++) {
 			if (currentChar == wwd[i]) {
 				CrosswordPuzzle puzzleExt = puzzle;
-				puzzleExt.emplace_back(wwd, x, y);
-				if (puzzleExt.valid()) {
-					found.push_back(puzzleExt);
-				} else {
-					found.push_back(CrosswordPuzzle(puzzle, wwd));
-				}
+				pbtp(puzzleExt, wwd, x, y, i);
+				pnpFunctor(puzzle, puzzleExt, wwd);
 			}
 		}
 	}
-	return found;
 }
 
-std::vector<CrosswordPuzzle> findCrosswordPuzzles(
-		const std::vector<CrosswordPuzzle>& puzzles,
-		const WordWithDirection& wwd) {
-	using D = Crossword::Direction;
-	std::vector<CrosswordPuzzle> found;
+class PushBackVerticalWord {
+public:
+	void operator()(CrosswordPuzzle& puzzle, const WordWithDirection& wwd,
+			int x, int y, size_t i) {
+		puzzle.emplace_back(wwd, x, y - i);
+	}
+};
 
-	for (CrosswordPuzzle puzzle : puzzles) {
-		for (Crossword cw : puzzle) {
+class PushBackHorizontalWord {
+public:
+	void operator()(CrosswordPuzzle& puzzle, const WordWithDirection& wwd,
+			int x, int y, size_t i) {
+		puzzle.emplace_back(wwd, x - i, y);
+	}
+};
+
+template <class PROCESS_NEXT_PUZZLE>
+void processNextCrosswordPuzzles(const std::vector<CrosswordPuzzle>& puzzles,
+		const WordWithDirection& wwd, PROCESS_NEXT_PUZZLE& pnpFunctor) {
+	for (const CrosswordPuzzle& puzzle : puzzles) {
+		for (const Crossword& cw : puzzle) {
 			if (cw.direction() == wwd.direction()) {
 				continue;
 			}
-			if (cw.direction() == D::HORIZONTAL) {
-				size_t y = cw.yStart();
-				for (size_t x=cw.xStart(); x<cw.xEnd(); x++) {
-					std::vector<CrosswordPuzzle> f =
-							findCrosswordPuzzles(puzzle, x, y, wwd);
-					found.insert(found.end(), f.begin(), f.end());
+			if (cw.direction() == Crossword::Direction::HORIZONTAL) {
+				int y = cw.yStart();
+				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
+					CrosswordPuzzle puzzleExt = puzzle;
+					processNextCrosswordPuzzles<PushBackVerticalWord,
+						PROCESS_NEXT_PUZZLE>(puzzleExt, x, y, wwd,
+								pnpFunctor);
 				}
 			} else {
-				size_t x = cw.xStart();
-				for (size_t y=cw.yStart(); y<cw.yEnd(); y++) {
-					std::vector<CrosswordPuzzle> f =
-							findCrosswordPuzzles(puzzle, x, y, wwd);
-					found.insert(found.end(), f.begin(), f.end());
+				int x = cw.xStart();
+				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
+					CrosswordPuzzle puzzleExt = puzzle;
+					processNextCrosswordPuzzles<PushBackHorizontalWord,
+						PROCESS_NEXT_PUZZLE>(puzzleExt, x, y, wwd,
+								pnpFunctor);
 				}
 			}
 		}
@@ -480,10 +524,43 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzles(
 	if (puzzles.size() == 0) {
 		CrosswordPuzzle puzzle;
 		puzzle.emplace_back(wwd, 0, 0);
-		found.push_back(puzzle);
+		pnpFunctor(CrosswordPuzzle(), puzzle, wwd);
 	}
-	return found;
 }
+
+class AlwaysPushBack {
+public:
+	AlwaysPushBack(std::vector<CrosswordPuzzle>& found)
+    : _found (found) {
+	}
+	void operator()(const CrosswordPuzzle& puzzleOrigin,
+			const CrosswordPuzzle& puzzleNew,
+			const WordWithDirection& currentWord){
+		if (puzzleNew.valid()) {
+			_found.push_back(puzzleNew);
+		} else {
+			_found.push_back(CrosswordPuzzle(puzzleOrigin, currentWord));
+		}
+	}
+private:
+	std::vector<CrosswordPuzzle>& _found;
+};
+
+class IfValidPushBack {
+public:
+	IfValidPushBack(std::vector<CrosswordPuzzle>& found)
+    : _found (found) {
+	}
+	void operator()(const CrosswordPuzzle& puzzleOrigin,
+			const CrosswordPuzzle& puzzleNew,
+			const WordWithDirection& currentWord){
+		if (puzzleNew.valid()) {
+			_found.push_back(puzzleNew);
+		}
+	}
+private:
+	std::vector<CrosswordPuzzle>& _found;
+};
 
 template <class CrosswordProgress>
 std::vector<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
@@ -504,11 +581,29 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 						directions[i] == 0 ? D::HORIZONTAL : D::VERTICAL);
 			}
 			std::vector<CrosswordPuzzle> foundUnfiltered;
-			for (WordWithDirection wwd : wordsWithDirection) {
-				foundUnfiltered = findCrosswordPuzzles(foundUnfiltered, wwd);
+			for (const WordWithDirection& wwd : wordsWithDirection) {
+				std::vector<CrosswordPuzzle> nextFounds;
+				AlwaysPushBack alwaysPushBack(nextFounds);
+				processNextCrosswordPuzzles<AlwaysPushBack>(foundUnfiltered,
+						wwd, alwaysPushBack);
+				foundUnfiltered.insert(foundUnfiltered.begin(),
+						nextFounds.begin(), nextFounds.end());
 			}
-			// TODO: Process all puzzles again and try to place the independents
-			for (CrosswordPuzzle foundPuzzle : foundUnfiltered) {
+//			std::vector<CrosswordPuzzle> foundUnfilteredExt;
+//			IfValidPushBack ifValidPushBack(foundUnfilteredExt);
+//			for (const CrosswordPuzzle& puzzle : foundUnfiltered) {
+//				std::vector<CrosswordPuzzle> nextFounds;
+//				IfValidPushBack ifValidPushBack(nextFounds);
+//				for (const WordWithDirection& iw: puzzle.independent()) {
+//					processNextCrosswordPuzzles(foundUnfiltered, iw,
+//							ifValidPushBack);
+//				}
+//				foundUnfilteredExt.insert(foundUnfilteredExt.begin(),
+//						nextFounds.begin(), nextFounds.end());
+//			}
+//			foundUnfiltered.insert(foundUnfiltered.begin(),
+//					foundUnfilteredExt.begin(), foundUnfilteredExt.end());
+			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
 				if (c >= minCrosses) {
 					found.push_back(foundPuzzle);
@@ -565,6 +660,6 @@ int main() {
 			"BAZAR"};
 	std::vector<CrosswordPuzzle> foundCrosswords =
 			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
-					words, 2, 1000);
-	return foundCrosswords.size();
+					words, 4, 100000);
+	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
 }
