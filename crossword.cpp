@@ -493,40 +493,6 @@ public:
 	}
 };
 
-template <class PROCESS_NEXT_PUZZLE>
-void processNextCrosswordPuzzles(const std::vector<CrosswordPuzzle>& puzzles,
-		const WordWithDirection& wwd, PROCESS_NEXT_PUZZLE& pnpFunctor) {
-	for (const CrosswordPuzzle& puzzle : puzzles) {
-		for (const Crossword& cw : puzzle) {
-			if (cw.direction() == wwd.direction()) {
-				continue;
-			}
-			if (cw.direction() == Crossword::Direction::HORIZONTAL) {
-				int y = cw.yStart();
-				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
-					CrosswordPuzzle puzzleExt = puzzle;
-					processNextCrosswordPuzzles<PushBackVerticalWord,
-						PROCESS_NEXT_PUZZLE>(puzzleExt, x, y, wwd,
-								pnpFunctor);
-				}
-			} else {
-				int x = cw.xStart();
-				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
-					CrosswordPuzzle puzzleExt = puzzle;
-					processNextCrosswordPuzzles<PushBackHorizontalWord,
-						PROCESS_NEXT_PUZZLE>(puzzleExt, x, y, wwd,
-								pnpFunctor);
-				}
-			}
-		}
-	}
-	if (puzzles.size() == 0) {
-		CrosswordPuzzle puzzle;
-		puzzle.emplace_back(wwd, 0, 0);
-		pnpFunctor(CrosswordPuzzle(), puzzle, wwd);
-	}
-}
-
 class StoreValidPuzzle {
 public:
 	StoreValidPuzzle(std::vector<CrosswordPuzzle>& found)
@@ -543,21 +509,67 @@ private:
 	std::vector<CrosswordPuzzle>& _found;
 };
 
+std::vector<CrosswordPuzzle> findCrosswordPuzzles(
+		const std::vector<CrosswordPuzzle>& puzzles,
+		const WordWithDirection& wwd) {
+	std::vector<CrosswordPuzzle> result;
+	StoreValidPuzzle storeValidPuzzle(result);
+	for (const CrosswordPuzzle& puzzle : puzzles) {
+		for (const Crossword& cw : puzzle) {
+			if (cw.direction() == wwd.direction()) {
+				continue;
+			}
+			if (cw.direction() == Crossword::Direction::HORIZONTAL) {
+				int y = cw.yStart();
+				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
+					CrosswordPuzzle puzzleExt = puzzle;
+					processNextCrosswordPuzzles<PushBackVerticalWord>(
+							puzzleExt, x, y, wwd, storeValidPuzzle);
+				}
+			} else {
+				int x = cw.xStart();
+				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
+					CrosswordPuzzle puzzleExt = puzzle;
+					processNextCrosswordPuzzles<PushBackHorizontalWord>(
+							puzzleExt, x, y, wwd, storeValidPuzzle);
+				}
+			}
+		}
+	}
+	if (puzzles.size() == 0) {
+		CrosswordPuzzle puzzle;
+		puzzle.emplace_back(wwd, 0, 0);
+		result.push_back(puzzle);
+	}
+	return result;
+}
+
+size_t factorial(size_t n) {
+	size_t result = 1;
+    for(size_t i=1; i<=n; ++i)
+    {
+        result *= i;
+    }
+    return result;
+}
+
+size_t power(size_t x, size_t p) {
+  if (p == 0) return 1;
+  if (p == 1) return x;
+  return x * power(x, p-1);
+}
+
 template <class CrosswordProgress>
 std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 		const std::vector<std::string>& words,
 		size_t minCrosses, size_t maxMatches) {
 	std::set<CrosswordPuzzle> found;
-	CrosswordProgress cp;
 	size_t n = 0;
 	std::vector<std::string> permutedWords = words;
+	CrosswordProgress cp(factorial(words.size()) * power(2, words.size()));
+	// Sort words to get all permutations.
+	std::sort(permutedWords.begin(), permutedWords.end());
 
-	// Sort words by length so that the of the longest word changes very often
-	// between vertical and horizontal.
-	std::sort(permutedWords.begin(), permutedWords.end(),
-			[](const std::string& a, const std::string& b) {
-		return a.length() < b.length();
-	});
 	do {
 		std::vector<size_t> directions (words.size(), 0);
 		do {
@@ -569,12 +581,7 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			}
 			std::vector<CrosswordPuzzle> foundUnfiltered;
 			for (const WordWithDirection& wwd : wordsWithDirection) {
-				std::vector<CrosswordPuzzle> nextFounds;
-				StoreValidPuzzle storeValidPuzzle(nextFounds);
-				processNextCrosswordPuzzles<StoreValidPuzzle>(foundUnfiltered,
-						wwd, storeValidPuzzle);
-				foundUnfiltered.insert(foundUnfiltered.begin(),
-						nextFounds.begin(), nextFounds.end());
+				foundUnfiltered = findCrosswordPuzzles(foundUnfiltered, wwd);
 			}
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
@@ -597,7 +604,11 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 	return found;
 }
 
-struct CrosswordProgressPrinter {
+class CrosswordProgressPrinter {
+public:
+	CrosswordProgressPrinter(size_t numberOfVariants)
+    : _numberOfVariants(numberOfVariants) {
+	}
 	void foundSolution(const CrosswordPuzzle& puzzle, size_t crosses,
 			size_t iterations) {
 		std::cout << "Found solution (";
@@ -607,11 +618,13 @@ struct CrosswordProgressPrinter {
 		std::cout << "===============\n";
 	}
 	void nextIteration(size_t n) {
-		if (n % 10000000 == 0 && n != 0) {
-			std::cout << "Searched " << n / 1000000;
-			std::cout << " million variants.\n";
+		if (n % 100 == 0 && n != 0) {
+			std::cout << "Searched " << n << " of " << _numberOfVariants;
+			std::cout << " variants.\n";
 		}
 	}
+private:
+	size_t _numberOfVariants;
 };
 
 int main() {
@@ -636,6 +649,9 @@ int main() {
 //	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
 //			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
 //	        "HUENDLE", "STELLER", "MAIWANDERUNG"};
+//	std::set<CrosswordPuzzle> foundCrosswords =
+//			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
+//					words, 12, 100000);
 	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
 			"BAZAR"};
 	std::set<CrosswordPuzzle> foundCrosswords =
