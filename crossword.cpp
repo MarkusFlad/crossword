@@ -286,6 +286,17 @@ protected:
 	}
 };
 
+CrosswordPuzzle normalizedPuzzle (const CrosswordPuzzle& puzzle) {
+	int xPuzzleStart = puzzle.xStart();
+	int yPuzzleStart = puzzle.yStart();
+	CrosswordPuzzle result;
+	for (Crossword cw : puzzle) {
+		result.emplace_back(cw, cw.xStart() - xPuzzleStart,
+				cw.yStart() - yPuzzleStart);
+	}
+	return result;
+}
+
 class TestFailed : public std::exception {
 public:
 	TestFailed(const std::string& message)
@@ -568,7 +579,7 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
 				if (c >= minCrosses) {
-					found.insert(foundPuzzle);
+					found.insert(normalizedPuzzle(foundPuzzle));
 					cp.foundSolution(foundPuzzle, c, n);
 					if (found.size() >= maxMatches) {
 						return found;
