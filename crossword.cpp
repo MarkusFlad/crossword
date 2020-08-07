@@ -579,7 +579,11 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
 				if (c >= minCrosses) {
-					found.insert(normalizedPuzzle(foundPuzzle));
+					CrosswordPuzzle np = normalizedPuzzle(foundPuzzle);
+					if (found.find(np) != found.end()) {
+						continue;
+					}
+					found.insert(np);
 					cp.foundSolution(foundPuzzle, c, n);
 					if (found.size() >= maxMatches) {
 						return found;
