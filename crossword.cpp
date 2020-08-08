@@ -15,6 +15,9 @@ public:
 	WordWithDirection (const char* text,  Direction direction)
 	: _text (text), _direction(direction) {
 	}
+	std::string text() const {
+		return _text;
+	}
 	char operator[](size_t i) const {
 		return _text[i];
 	}
@@ -528,15 +531,19 @@ std::vector<CrosswordPuzzle> findCrosswordPuzzles(
 				int y = cw.yStart();
 				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
 					CrosswordPuzzle puzzleExt = puzzle;
-					processNextCrosswordPuzzles<PushBackVerticalWord>(
-							puzzleExt, x, y, wwd, storeValidPuzzle);
+					if (processNextCrosswordPuzzles<PushBackVerticalWord>(
+							puzzleExt, x, y, wwd, storeValidPuzzle)) {
+						break;
+					}
 				}
 			} else {
 				int x = cw.xStart();
 				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
 					CrosswordPuzzle puzzleExt = puzzle;
-					processNextCrosswordPuzzles<PushBackHorizontalWord>(
-							puzzleExt, x, y, wwd, storeValidPuzzle);
+					if (processNextCrosswordPuzzles<PushBackHorizontalWord>(
+							puzzleExt, x, y, wwd, storeValidPuzzle)) {
+						break;
+					}
 				}
 			}
 		}
@@ -571,14 +578,16 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 	std::set<CrosswordPuzzle> found;
 	size_t n = 0;
 	std::vector<std::string> permutedWords = words;
-	CrosswordProgress cp(factorial(words.size()) * power(2, words.size() - 1));
+	CrosswordProgress cp(factorial(words.size()) *
+			(power(2, words.size() / 2)));
 	// Sort words to get all permutations.
 	std::sort(permutedWords.begin(), permutedWords.end());
 
 	do {
 		std::vector<size_t> directions (words.size(), 0);
-		// Skip the first permutations where all directions are the same
-		directions[0] = 1;
+		for (size_t i=0; i<words.size(); i++) {
+			directions[i] = i%2;
+		}
 		do {
 			using D = Crossword::Direction;
 			std::vector<WordWithDirection> wordsWithDirection;
@@ -659,7 +668,7 @@ int main() {
 //	        "XAVER", "XELSBOCK", "SYSTEM", "ROLLADEN", "BUCH"};
 //	std::set<CrosswordPuzzle> foundCrosswords =
 //			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
-//					words, 14, 100000);
+//					words, 22, 100000);
 	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
 			"BAZAR"};
 	std::set<CrosswordPuzzle> foundCrosswords =
