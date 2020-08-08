@@ -178,7 +178,7 @@ public:
 	    size_t result = 0;
 
 		for (int y=yStart(); y<yEnd(); y++) {
-			for (int x=xStart(); x<yEnd(); x++) {
+			for (int x=xStart(); x<xEnd(); x++) {
 				CharactersInWord csiw = characters(x, y);
 				if (csiw.size() > 1) {
 					result++;
@@ -585,7 +585,7 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 			}
 			for (const CrosswordPuzzle& foundPuzzle : foundUnfiltered) {
 				size_t c = foundPuzzle.crosses();
-				if (c >= minCrosses) {
+				if (foundPuzzle.size() == words.size() && c >= minCrosses) {
 					CrosswordPuzzle np = normalizedPuzzle(foundPuzzle);
 					if (found.find(np) != found.end()) {
 						continue;
@@ -651,7 +651,7 @@ int main() {
 //	        "HUENDLE", "STELLER", "MAIWANDERUNG"};
 //	std::set<CrosswordPuzzle> foundCrosswords =
 //			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
-//					words, 12, 100000);
+//					words, 2, 100000);
 	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
 			"BAZAR"};
 	std::set<CrosswordPuzzle> foundCrosswords =
