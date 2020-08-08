@@ -459,7 +459,7 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesByBruteForce(
 }
 
 template <class PUSH_BACK_TO_PUZZLE, class PROCESS_NEXT_PUZZLE>
-void processNextCrosswordPuzzles(const CrosswordPuzzle& puzzle,
+bool processNextCrosswordPuzzles(const CrosswordPuzzle& puzzle,
 		int x, int y, const WordWithDirection& wwd,
 		PROCESS_NEXT_PUZZLE& pnpFunctor) {
 	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
@@ -471,10 +471,13 @@ void processNextCrosswordPuzzles(const CrosswordPuzzle& puzzle,
 			if (currentChar == wwd[i]) {
 				CrosswordPuzzle puzzleExt = puzzle;
 				pbtp(puzzleExt, wwd, x, y, i);
-				pnpFunctor(puzzle, puzzleExt, wwd);
+				if (pnpFunctor(puzzle, puzzleExt, wwd)) {
+					return true;
+				}
 			}
 		}
 	}
+	return false;
 }
 
 class PushBackVerticalWord {
@@ -498,12 +501,14 @@ public:
 	StoreValidPuzzle(std::vector<CrosswordPuzzle>& found)
     : _found (found) {
 	}
-	void operator()(const CrosswordPuzzle& puzzleOrigin,
+	bool operator()(const CrosswordPuzzle& puzzleOrigin,
 			const CrosswordPuzzle& puzzleNew,
 			const WordWithDirection& currentWord){
 		if (puzzleNew.valid()) {
 			_found.push_back(puzzleNew);
+			return true;
 		}
+		return false;
 	}
 private:
 	std::vector<CrosswordPuzzle>& _found;
@@ -566,12 +571,14 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 	std::set<CrosswordPuzzle> found;
 	size_t n = 0;
 	std::vector<std::string> permutedWords = words;
-	CrosswordProgress cp(factorial(words.size()) * power(2, words.size()));
+	CrosswordProgress cp(factorial(words.size()) * power(2, words.size() - 1));
 	// Sort words to get all permutations.
 	std::sort(permutedWords.begin(), permutedWords.end());
 
 	do {
 		std::vector<size_t> directions (words.size(), 0);
+		// Skip the first permutations where all directions are the same
+		directions[0] = 1;
 		do {
 			using D = Crossword::Direction;
 			std::vector<WordWithDirection> wordsWithDirection;
@@ -648,10 +655,11 @@ int main() {
 	}
 //	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
 //			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
-//	        "HUENDLE", "STELLER", "MAIWANDERUNG"};
+//	        "HUENDLE", "STELLER", "MAIWANDERUNG", "MARKUS", "ELENA", "PETRA",
+//	        "XAVER", "XELSBOCK", "SYSTEM", "ROLLADEN", "BUCH"};
 //	std::set<CrosswordPuzzle> foundCrosswords =
 //			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
-//					words, 2, 100000);
+//					words, 14, 100000);
 	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
 			"BAZAR"};
 	std::set<CrosswordPuzzle> foundCrosswords =
