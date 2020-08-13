@@ -652,13 +652,34 @@ CrosswordPuzzle findAnyPuzzle(const CrosswordPuzzle& puzzle,
 			if (currentChar == word[i]) {
 				CrosswordPuzzle puzzleExt = puzzle;
 				estp(puzzleExt, word, x, y, i);
-				pt.validCheck(puzzleExt);
+				pt.validCheck(puzzle, puzzleExt, word);
 				if (puzzleExt.valid()) {
 					result = puzzleExt;
 					break;
 				}
 			}
 		}
+	}
+	return result;
+}
+
+template<class EMPLACE_STRING_TO_PUZZLE, class PROGRESS_TRACER>
+std::vector<CrosswordPuzzle> findPuzzles(
+		const CrosswordPuzzle& puzzle, const std::string& word,
+		int x, int y, const std::vector<std::string>& remainingWords,
+		size_t minCrosses, size_t minPuzzles, PROGRESS_TRACER& pt) {
+	std::vector<CrosswordPuzzle> result;
+	CrosswordPuzzle puzzleExt = findAnyPuzzle<EMPLACE_STRING_TO_PUZZLE>(puzzle,
+			x, y, word, pt);
+	if (puzzleExt.size() > 0) {
+		std::vector<CrosswordPuzzle> found = findPuzzles(
+				puzzleExt, remainingWords, minCrosses,
+				minPuzzles, pt);
+		std::copy_if (found.begin(), found.end(),
+				std::back_inserter(result),
+				[minCrosses](const CrosswordPuzzle& p){
+			return p.crosses() >= minCrosses;
+		});
 	}
 	return result;
 }
@@ -678,59 +699,35 @@ std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 		return result;
 	}
 	for (const std::string& word : words) {
+		std::vector<std::string> remainingWords(words);
+		auto itWord = std::find(remainingWords.begin(),
+				remainingWords.end(), word);
+		remainingWords.erase(itWord);
 		for (const Crossword& cw : puzzle) {
 			if (cw.direction() == D::HORIZONTAL) {
 				int y = cw.yStart();
 				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
-					CrosswordPuzzle puzzleExt =
-							findAnyPuzzle<EmplaceStringVertical>(puzzle, x, y,
-									word, pt);
-					if (puzzleExt.size() > 0) {
-						std::vector<std::string> remainingWords(words);
-						auto itWord = std::find(remainingWords.begin(),
-								remainingWords.end(), word);
-						remainingWords.erase(itWord);
-						std::vector<CrosswordPuzzle> found = findPuzzles(
-								puzzleExt, remainingWords, minCrosses,
-								minPuzzles, pt);
-						if (found.size() == 0) {
-							continue;
-						}
-						std::copy_if (found.begin(), found.end(),
-								std::back_inserter(result),
-								[minCrosses](const CrosswordPuzzle& p){
-							return p.crosses() >= minCrosses;
-						});
-						if (result.size() >= minPuzzles) {
-							return result;
-						}
+					std::vector<CrosswordPuzzle> found =
+							findPuzzles<EmplaceStringVertical>(puzzle, word,
+									x, y, remainingWords,
+									minCrosses, minPuzzles, pt);
+					std::copy(found.begin(), found.end(),
+							std::back_inserter(result));
+					if (result.size() >= minPuzzles) {
+						return result;
 					}
 				}
 			} else {
 				int x = cw.xStart();
 				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
-					CrosswordPuzzle puzzleExt =
-							findAnyPuzzle<EmplaceStringHorizontal>(puzzle, x, y,
-									word, pt);
-					if (puzzleExt.size() > 0) {
-						std::vector<std::string> remainingWords(words);
-						auto itWord = std::find(remainingWords.begin(),
-								remainingWords.end(), word);
-						remainingWords.erase(itWord);
-						std::vector<CrosswordPuzzle> found = findPuzzles(
-								puzzleExt, remainingWords, minCrosses,
-								minPuzzles, pt);
-						if (found.size() == 0) {
-							continue;
-						}
-						std::copy_if (found.begin(), found.end(),
-								std::back_inserter(result),
-								[minCrosses](const CrosswordPuzzle& p){
-							return p.crosses() >= minCrosses;
-						});
-						if (result.size() >= minPuzzles) {
-							return result;
-						}
+					std::vector<CrosswordPuzzle> found =
+							findPuzzles<EmplaceStringHorizontal>(puzzle, word,
+									x, y, remainingWords,
+									minCrosses, minPuzzles, pt);
+					std::copy(found.begin(), found.end(),
+							std::back_inserter(result));
+					if (result.size() >= minPuzzles) {
+						return result;
 					}
 				}
 			}
@@ -744,7 +741,8 @@ public:
 	SimpleProgressTracer()
 	: _numberOfValidChecks(0) {
 	}
-	void validCheck(const CrosswordPuzzle& puzzle) {
+	void validCheck(const CrosswordPuzzle& puzzleOld,
+			const CrosswordPuzzle& puzzleNew, const std::string& word) {
 		_numberOfValidChecks++;
 		if (_numberOfValidChecks % 100000 == 0) {
 			std::cout << "Searched " << _numberOfValidChecks << " variants.\n";
