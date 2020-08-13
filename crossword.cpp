@@ -639,9 +639,9 @@ public:
 	}
 };
 
-template <class EMPLACE_STRING_TO_PUZZLE>
+template <class EMPLACE_STRING_TO_PUZZLE, class PROGRESS_TRACER>
 CrosswordPuzzle findAnyPuzzle(const CrosswordPuzzle& puzzle,
-		int x, int y, const std::string& word) {
+		int x, int y, const std::string& word, PROGRESS_TRACER& pt) {
 	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
 	CrosswordPuzzle result;
 	CharactersInWord ciw = puzzle.characters(x, y);
@@ -652,6 +652,7 @@ CrosswordPuzzle findAnyPuzzle(const CrosswordPuzzle& puzzle,
 			if (currentChar == word[i]) {
 				CrosswordPuzzle puzzleExt = puzzle;
 				estp(puzzleExt, word, x, y, i);
+				pt.validCheck(puzzleExt);
 				if (puzzleExt.valid()) {
 					result = puzzleExt;
 					break;
@@ -662,9 +663,10 @@ CrosswordPuzzle findAnyPuzzle(const CrosswordPuzzle& puzzle,
 	return result;
 }
 
+template<class PROGRESS_TRACER>
 std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 		const std::vector<std::string>& words, size_t minCrosses,
-		size_t minPuzzles) {
+		size_t minPuzzles, PROGRESS_TRACER& pt) {
 	using D = WordWithDirection::Direction;
 	std::vector<CrosswordPuzzle> result;
 
@@ -682,7 +684,7 @@ std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
 					CrosswordPuzzle puzzleExt =
 							findAnyPuzzle<EmplaceStringVertical>(puzzle, x, y,
-									word);
+									word, pt);
 					if (puzzleExt.size() > 0) {
 						std::vector<std::string> remainingWords(words);
 						auto itWord = std::find(remainingWords.begin(),
@@ -690,12 +692,15 @@ std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 						remainingWords.erase(itWord);
 						std::vector<CrosswordPuzzle> found = findPuzzles(
 								puzzleExt, remainingWords, minCrosses,
-								minPuzzles);
+								minPuzzles, pt);
 						if (found.size() == 0) {
 							continue;
 						}
-						std::copy (found.begin(), found.end(),
-								std::back_inserter(result));
+						std::copy_if (found.begin(), found.end(),
+								std::back_inserter(result),
+								[minCrosses](const CrosswordPuzzle& p){
+							return p.crosses() >= minCrosses;
+						});
 						if (result.size() >= minPuzzles) {
 							return result;
 						}
@@ -706,21 +711,23 @@ std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
 					CrosswordPuzzle puzzleExt =
 							findAnyPuzzle<EmplaceStringHorizontal>(puzzle, x, y,
-									word);
-					if (puzzleExt.size() > 0 &&
-							puzzleExt.crosses() >= minCrosses) {
+									word, pt);
+					if (puzzleExt.size() > 0) {
 						std::vector<std::string> remainingWords(words);
 						auto itWord = std::find(remainingWords.begin(),
 								remainingWords.end(), word);
 						remainingWords.erase(itWord);
 						std::vector<CrosswordPuzzle> found = findPuzzles(
 								puzzleExt, remainingWords, minCrosses,
-								minPuzzles);
+								minPuzzles, pt);
 						if (found.size() == 0) {
 							continue;
 						}
-						std::copy (found.begin(), found.end(),
-								std::back_inserter(result));
+						std::copy_if (found.begin(), found.end(),
+								std::back_inserter(result),
+								[minCrosses](const CrosswordPuzzle& p){
+							return p.crosses() >= minCrosses;
+						});
 						if (result.size() >= minPuzzles) {
 							return result;
 						}
@@ -732,8 +739,27 @@ std::vector<CrosswordPuzzle> findPuzzles(const CrosswordPuzzle& puzzle,
 	return result;
 }
 
+class SimpleProgressTracer {
+public:
+	SimpleProgressTracer()
+	: _numberOfValidChecks(0) {
+	}
+	void validCheck(const CrosswordPuzzle& puzzle) {
+		_numberOfValidChecks++;
+		if (_numberOfValidChecks % 100000 == 0) {
+			std::cout << "Searched " << _numberOfValidChecks << " variants.\n";
+		}
+	}
+	size_t numberOfValidChecks() const {
+		return _numberOfValidChecks;
+	}
+private:
+	size_t _numberOfValidChecks;
+};
+
+template<class PROGRESS_TRACER>
 std::vector<CrosswordPuzzle> findPuzzles(const std::vector<std::string>& words,
-		size_t minCrosses, size_t minPuzzles) {
+		size_t minCrosses, size_t minPuzzles, PROGRESS_TRACER& progressTracer) {
 	std::vector<CrosswordPuzzle> puzzles;
 	for (const std::string& word : words) {
 		std::vector<std::string> remainingWords(words);
@@ -747,7 +773,7 @@ std::vector<CrosswordPuzzle> findPuzzles(const std::vector<std::string>& words,
 				WordWithDirection::Direction::HORIZONTAL);
 		std::vector<CrosswordPuzzle> foundHorizontal = findPuzzles(
 				puzzleStartHorizontal,remainingWords, minCrosses,
-				minPuzzles - puzzles.size());
+				minPuzzles - puzzles.size(), progressTracer);
 		puzzles.insert(puzzles.begin(),
 				foundHorizontal.begin(), foundHorizontal.end());
 		if (puzzles.size() >= minPuzzles) {
@@ -758,7 +784,7 @@ std::vector<CrosswordPuzzle> findPuzzles(const std::vector<std::string>& words,
 				WordWithDirection::Direction::VERTICAL);
 		std::vector<CrosswordPuzzle> foundVertical = findPuzzles(
 				puzzleStartVertical, remainingWords, minCrosses,
-				minPuzzles - puzzles.size());
+				minPuzzles - puzzles.size(), progressTracer);
 		puzzles.insert(puzzles.begin(),
 				foundVertical.begin(), foundVertical.end());
 		if (puzzles.size() >= minPuzzles) {
@@ -825,10 +851,12 @@ int main() {
 //			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
 //					words, 4, 100000);
 //	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
-	auto foundPuzzles = findPuzzles(words, 7, 100);
+	SimpleProgressTracer progressTracer;
+	auto foundPuzzles = findPuzzles(words, 10, 1, progressTracer);
 	for (CrosswordPuzzle puzzle : foundPuzzles) {
 		std::cout << "Next Puzzle (" << puzzle.crosses() << " crosses):\n";
 		std::cout << puzzle.toString() << "\n";
 	}
 	std::cout << "Found " << foundPuzzles.size() << " puzzles\n";
+	std::cout << "Tried " << progressTracer.numberOfValidChecks() << " variants\n";
 }
