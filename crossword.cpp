@@ -1,4 +1,5 @@
 #include <vector>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -620,6 +621,115 @@ std::set<CrosswordPuzzle> findCrosswordPuzzlesBySica1(
 	return found;
 }
 
+class EmplaceStringVertical {
+public:
+	void operator()(CrosswordPuzzle& puzzle, const std::string& word,
+			int x, int y, size_t i) {
+		puzzle.emplace_back(WordWithDirection(word.c_str(),
+				WordWithDirection::Direction::VERTICAL), x, y - i);
+	}
+};
+
+class EmplaceStringHorizontal {
+public:
+	void operator()(CrosswordPuzzle& puzzle, const std::string& word,
+			int x, int y, size_t i) {
+		puzzle.emplace_back(WordWithDirection(word.c_str(),
+				WordWithDirection::Direction::HORIZONTAL), x - i, y);
+	}
+};
+
+template <class EMPLACE_STRING_TO_PUZZLE>
+CrosswordPuzzle findAnyPuzzle(const CrosswordPuzzle& puzzle,
+		int x, int y, const std::string& word) {
+	using CharactersInWord = std::vector<std::pair<char, const Crossword*>>;
+	CrosswordPuzzle result;
+	CharactersInWord ciw = puzzle.characters(x, y);
+	char currentChar = ciw[0].first;
+	if (ciw.size() == 1) {
+		EMPLACE_STRING_TO_PUZZLE estp;
+		for (size_t i=0; i<word.length(); i++) {
+			if (currentChar == word[i]) {
+				CrosswordPuzzle puzzleExt = puzzle;
+				estp(puzzleExt, word, x, y, i);
+				if (puzzleExt.valid()) {
+					result = puzzleExt;
+					break;
+				}
+			}
+		}
+	}
+	return result;
+}
+
+CrosswordPuzzle findPuzzle(const CrosswordPuzzle& puzzle,
+		const std::vector<std::string>& words) {
+	using D = WordWithDirection::Direction;
+	std::vector<std::string> remainingWords(words);
+
+	if (words.size() == 0) {
+		return puzzle;
+	}
+	for (std::vector<std::string>::const_iterator it=remainingWords.begin();
+			it!=remainingWords.end(); ++it) {
+		const std::string& word = *it;
+		for (const Crossword& cw : puzzle) {
+			if (cw.direction() == D::HORIZONTAL) {
+				int y = cw.yStart();
+				for (int x=cw.xStart(); x<cw.xEnd(); x++) {
+					CrosswordPuzzle puzzleExt =
+							findAnyPuzzle<EmplaceStringVertical>(puzzle, x, y,
+									word);
+					if (puzzleExt.size() > 0) {
+						remainingWords.erase(it);
+						return findPuzzle(puzzleExt, remainingWords);
+					}
+				}
+			} else {
+				int x = cw.xStart();
+				for (int y=cw.yStart(); y<cw.yEnd(); y++) {
+					CrosswordPuzzle puzzleExt =
+							findAnyPuzzle<EmplaceStringHorizontal>(puzzle, x, y,
+									word);
+					if (puzzleExt.size() > 0) {
+						remainingWords.erase(it);
+						return findPuzzle(puzzleExt, remainingWords);
+					}
+				}
+			}
+		}
+	}
+	std::cout << puzzle.toString() << "\n";
+	return CrosswordPuzzle();
+}
+
+CrosswordPuzzle findPuzzle(const std::vector<std::string>& words) {
+	CrosswordPuzzle puzzle;
+	for (const std::string& word : words) {
+		std::vector<std::string> remainingWords(words);
+		auto itWord = std::find(remainingWords.begin(), remainingWords.end(),
+				word);
+		if (itWord != remainingWords.end()) {
+			remainingWords.erase(itWord);
+		}
+		CrosswordPuzzle puzzleStartHorizontal;
+		puzzleStartHorizontal.emplace_back(word.c_str(), 0, 0,
+				WordWithDirection::Direction::HORIZONTAL);
+		puzzle = findPuzzle(puzzleStartHorizontal, remainingWords);
+		if (puzzle.size() != 0) {
+			break;
+		}
+		CrosswordPuzzle puzzleStartVertical;
+		puzzleStartHorizontal.emplace_back(word.c_str(), 0, 0,
+				WordWithDirection::Direction::VERTICAL);
+		puzzle = findPuzzle(puzzleStartVertical, remainingWords);
+		if (puzzle.size() != 0) {
+			break;
+		}
+	}
+	return puzzle;
+}
+
 class CrosswordProgressPrinter {
 public:
 	CrosswordProgressPrinter(size_t numberOfVariants)
@@ -662,17 +772,19 @@ int main() {
 	} else {
 		std::cout << "All tests successful.\n";
 	}
-//	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
-//			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
-//	        "HUENDLE", "STELLER", "MAIWANDERUNG", "MARKUS", "ELENA", "PETRA",
-//	        "XAVER", "XELSBOCK", "SYSTEM", "ROLLADEN", "BUCH"};
+	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
+			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
+	        "HUENDLE", "STELLER", "MAIWANDERUNG", "MARKUS", "ELENA", "PETRA",
+	        "XAVER", "XELSBOCK", "SYSTEM", "ROLLADEN", "BUCH"};
 //	std::set<CrosswordPuzzle> foundCrosswords =
 //			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
 //					words, 22, 100000);
-	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
-			"BAZAR"};
-	std::set<CrosswordPuzzle> foundCrosswords =
-			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
-					words, 4, 100000);
-	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
+//	std::vector<std::string> words = {"MAIWANDERUNG", "NEUN", "SONNE", "RADWEG",
+//			"BAZAR"};
+//	std::set<CrosswordPuzzle> foundCrosswords =
+//			findCrosswordPuzzlesBySica1<CrosswordProgressPrinter>(
+//					words, 4, 100000);
+//	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
+	CrosswordPuzzle puzzle = findPuzzle(words);
+	std::cout << puzzle.toString() << "\n";
 }
