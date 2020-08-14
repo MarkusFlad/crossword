@@ -83,7 +83,7 @@ public:
 	}
 	int xEnd() const {
 		if (_direction == Direction::HORIZONTAL) {
-		    return _xStart + _text.length();
+		    return _xStart + static_cast<int>(_text.length());
 		} else {
 			return _xStart + 1;
 		}
@@ -92,7 +92,7 @@ public:
 		if (_direction == Direction::HORIZONTAL) {
 		    return _yStart + 1;
 		} else {
-			return _yStart + _text.length();
+			return _yStart + static_cast<int>(_text.length());
 		}
 	}
 private:
@@ -489,7 +489,7 @@ class PushBackVerticalWord {
 public:
 	void operator()(CrosswordPuzzle& puzzle, const WordWithDirection& wwd,
 			int x, int y, size_t i) {
-		puzzle.emplace_back(wwd, x, y - i);
+		puzzle.emplace_back(wwd, x, y - static_cast<int>(i));
 	}
 };
 
@@ -497,7 +497,7 @@ class PushBackHorizontalWord {
 public:
 	void operator()(CrosswordPuzzle& puzzle, const WordWithDirection& wwd,
 			int x, int y, size_t i) {
-		puzzle.emplace_back(wwd, x - i, y);
+		puzzle.emplace_back(wwd, x - static_cast<int>(i), y);
 	}
 };
 
@@ -627,7 +627,7 @@ public:
 	void operator()(CrosswordPuzzle& puzzle, const std::string& word,
 			int x, int y, size_t i) {
 		puzzle.emplace_back(WordWithDirection(word.c_str(),
-				WordWithDirection::Direction::VERTICAL), x, y - i);
+				WordWithDirection::Direction::VERTICAL), x, y - static_cast<int>(i));
 	}
 };
 
@@ -636,7 +636,7 @@ public:
 	void operator()(CrosswordPuzzle& puzzle, const std::string& word,
 			int x, int y, size_t i) {
 		puzzle.emplace_back(WordWithDirection(word.c_str(),
-				WordWithDirection::Direction::HORIZONTAL), x - i, y);
+				WordWithDirection::Direction::HORIZONTAL), x - static_cast<int>(i), y);
 	}
 };
 
