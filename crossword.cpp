@@ -6,6 +6,7 @@
 #include <iostream>
 #include <algorithm>
 #include <limits>
+#include <chrono>
 
 class WordWithDirection {
 public:
@@ -834,6 +835,7 @@ int main() {
 	} else {
 		std::cout << "All tests successful.\n";
 	}
+	auto start = std::chrono::steady_clock::now();
 //	std::vector<std::string> words = {"DEHNEN", "NIKOLAUS", "NEUREUTHER",
 //			"SOELDEN", "RUNDLAUF", "DREI", "HOCKE", "BUEGELEISEN", "FIS",
 //	        "HUENDLE", "STELLER", "MAIWANDERUNG", "MARKUS", "ELENA", "PETRA",
@@ -851,10 +853,13 @@ int main() {
 //	std::cout << "Found " << foundCrosswords.size() << " matching puzzles.\n";
 	SimpleProgressTracer progressTracer;
 	auto foundPuzzles = findPuzzles(words, 10, 1, progressTracer);
+	auto end = std::chrono::steady_clock::now();
+	std::chrono::duration<double> elapsed_seconds = end-start;
 	for (CrosswordPuzzle puzzle : foundPuzzles) {
 		std::cout << "Next Puzzle (" << puzzle.crosses() << " crosses):\n";
 		std::cout << puzzle.toString() << "\n";
 	}
 	std::cout << "Found " << foundPuzzles.size() << " puzzles\n";
 	std::cout << "Tried " << progressTracer.numberOfValidChecks() << " variants\n";
+	std::cout << "Elapsed time: " << elapsed_seconds.count() << "s\n";
 }
